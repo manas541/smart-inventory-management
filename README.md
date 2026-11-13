@@ -2,9 +2,17 @@
 
 A full-stack inventory management application with real-time stock monitoring, automated low-stock alerts, fast-depletion detection, and analytics across multiple warehouses.
 
+## Live Demo
+
+- **Frontend:** https://smart-inventory-management-1-83yw.onrender.com/
+- **Backend API:** https://smart-inventory-management-upha.onrender.com
+- **API Documentation:** https://smart-inventory-management-upha.onrender.com/docs
+
+*Note: Render free-tier services may take a short time to respond after being idle.*
+
 ## Features
 
-- **Product Management:** Create and manage products with unique SKUs and configurable minimum stock thresholds.
+- **Product Management:** Create, update, and manage products with unique SKUs and configurable minimum stock thresholds.
 - **Warehouse Management:** Manage multiple warehouses and their inventory.
 - **Inventory Tracking:** Monitor available stock across products and warehouses.
 - **Stock Movements:** Record inbound and outbound stock movements with movement history.
@@ -30,20 +38,20 @@ A full-stack inventory management application with real-time stock monitoring, a
 The application separates inventory operations from alert evaluation.
 
 ```text
-              React Dashboard
-                     |
-              REST API / WebSocket
-                     |
-               FastAPI Backend
-                     |
-          +----------+----------+
-          |                     |
-    CRUD Operations       Alert Service
-          |                     |
-          +----------+----------+
-                     |
-                 PostgreSQL
-                     |
+             React Dashboard
+                    |
+             REST API / WebSocket
+                    |
+              FastAPI Backend
+                    |
+          +---------+---------+
+          |                   |
+    CRUD Operations      Alert Service
+          |                   |
+          +---------+---------+
+                    |
+                PostgreSQL
+                    |
               Alert Scheduler
 ```
 
@@ -154,21 +162,48 @@ Database constraints provide additional protection against invalid quantities.
 
 ## API Endpoints
 
+### Products
+
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/api/products/` | Create a product |
 | GET | `/api/products/` | List products |
 | GET | `/api/products/{id}` | Get product details |
+| PATCH | `/api/products/{id}` | Update product details |
+| DELETE | `/api/products/{id}` | Delete a product when no related records exist |
+
+### Warehouses
+
+| Method | Endpoint | Description |
+|---|---|---|
 | POST | `/api/warehouses/` | Create a warehouse |
 | GET | `/api/warehouses/` | List warehouses |
-| GET | `/api/warehouses/{id}` | Get warehouse details |
-| POST | `/api/inventory/` | Create inventory |
+| PATCH | `/api/warehouses/{id}` | Update warehouse details |
+| DELETE | `/api/warehouses/{id}` | Delete a warehouse when no related records exist |
+
+### Inventory and Stock Movements
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/inventory/` | Create an inventory record |
 | GET | `/api/inventory/` | List inventory |
+| PATCH | `/api/inventory/{id}` | Update available quantity |
+| DELETE | `/api/inventory/{id}` | Delete an eligible inventory record |
 | POST | `/api/inventory/{id}/movement` | Record a stock movement |
 | GET | `/api/inventory/movements` | Get movement history |
+
+### Alerts
+
+| Method | Endpoint | Description |
+|---|---|---|
 | GET | `/api/alerts/` | List alerts |
 | GET | `/api/alerts/active` | List active alerts |
-| WS | `/ws/inventory` | Real-time inventory updates |
+
+### WebSocket
+
+| Type | Endpoint | Description |
+|---|---|---|
+| WS | `/ws/inventory` | Receive real-time inventory updates |
 
 Interactive API documentation is available through FastAPI Swagger UI at `/docs`.
 
@@ -226,9 +261,8 @@ Start the backend:
 python -m uvicorn app.main:app --reload --port 8001
 ```
 
-Backend URL: `http://localhost:8001`
-
-Swagger UI: `http://localhost:8001/docs`
+- Backend: http://localhost:8001
+- Swagger UI: http://localhost:8001/docs
 
 ### 3. Frontend Setup
 
@@ -252,7 +286,7 @@ Start the frontend:
 npm run dev
 ```
 
-Frontend URL: `http://localhost:5173`
+Frontend: http://localhost:5173
 
 ## Background Alert Evaluation
 
@@ -268,6 +302,7 @@ This ensures that time-dependent alerts, such as fast-depletion alerts, can be r
 - Demand forecasting has not been implemented because meaningful historical demand data is not yet available.
 - Scheduler execution is process-local. Multiple backend replicas would require a single scheduler instance or distributed scheduling mechanism.
 - Authentication and role-based authorization are not currently implemented.
+- Docker-based containerization has not been implemented in this version.
 
 ## Future Improvements
 
@@ -276,9 +311,10 @@ This ensures that time-dependent alerts, such as fast-depletion alerts, can be r
 - Redis Pub/Sub for WebSocket broadcasting across multiple backend instances.
 - Authentication and role-based access control.
 - Automated reorder recommendations based on predicted demand.
+- Docker-based containerization for consistent deployment across environments.
 
 ## Author
 
 **Manas Purohit**
 
-GitHub: [@manas541](https://github.com/manas541)
+GitHub: https://github.com/manas541
