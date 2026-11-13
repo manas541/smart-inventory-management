@@ -7,17 +7,37 @@ import {
   getInventory,
   createWarehouse,
   createInventory,
+  updateWarehouse,
+  deleteWarehouse,
 } from "../services/api";
-import { Warehouse as WarehouseIcon, Plus, RefreshCw } from "lucide-react";
+import { Warehouse as WarehouseIcon, Plus, RefreshCw, Pencil, Trash2, X, Check } from "lucide-react";
+
+interface Warehouse {
+  id: number;
+  name: string;
+  location: string;
+}
+
+interface Product {
+  id: number;
+  name: string;
+  sku: string;
+}
+
+interface InventoryRecord {
+  id: number;
+  product_id: number;
+  warehouse_id: number;
+  available_quantity: number;
+}
 
 export default function Warehouses() {
-  const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [inventory, setInventory] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [inventory, setInventory] = useState<InventoryRecord[]>([]);
 
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
-
   const [productId, setProductId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [initialQuantity, setInitialQuantity] = useState("0");
@@ -25,6 +45,8 @@ export default function Warehouses() {
   const [loading, setLoading] = useState(true);
   const [savingWarehouse, setSavingWarehouse] = useState(false);
   const [savingInventory, setSavingInventory] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", location: "" });
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -64,21 +86,13 @@ export default function Warehouses() {
 
     try {
       setSavingWarehouse(true);
-
-      await createWarehouse({
-        name: name.trim(),
-        location: location.trim(),
-      });
-
+      await createWarehouse({ name: name.trim(), location: location.trim() });
       setMessage("Warehouse created successfully.");
       setName("");
       setLocation("");
-
       await loadData();
     } catch (err: any) {
-      setError(
-        err.response?.data?.detail || "Unable to create warehouse."
-      );
+      setError(err.response?.data?.detail || "Unable to create warehouse.");
     } finally {
       setSavingWarehouse(false);
     }
@@ -114,7 +128,6 @@ export default function Warehouses() {
 
     try {
       setSavingInventory(true);
-
       await createInventory({
         product_id: Number(productId),
         warehouse_id: Number(warehouseId),
@@ -125,14 +138,63 @@ export default function Warehouses() {
       setProductId("");
       setWarehouseId("");
       setInitialQuantity("0");
-
       await loadData();
     } catch (err: any) {
-      setError(
-        err.response?.data?.detail || "Unable to assign product to warehouse."
-      );
+      setError(err.response?.data?.detail || "Unable to assign product to warehouse.");
     } finally {
       setSavingInventory(false);
+    }
+  };
+
+  const startEdit = (warehouse: Warehouse) => {
+    setEditingId(warehouse.id);
+    setEditForm({ name: warehouse.name, location: warehouse.location });
+    setError("");
+    setMessage("");
+  };
+
+  const handleUpdate = async (id: number) => {
+    setError("");
+    setMessage("");
+
+    if (!editForm.name.trim() || !editForm.location.trim()) {
+      setError("Warehouse name and location are required.");
+      return;
+    }
+
+    try {
+      setSavingWarehouse(true);
+      await updateWarehouse(id, {
+        name: editForm.name.trim(),
+        location: editForm.location.trim(),
+      });
+      setEditingId(null);
+      setMessage("Warehouse updated successfully.");
+      await loadData();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Unable to update warehouse.");
+    } finally {
+      setSavingWarehouse(false);
+    }
+  };
+
+  const handleDelete = async (warehouse: Warehouse) => {
+    const confirmed = window.confirm(
+      `Delete warehouse "${warehouse.name}"?\n\nWarehouses with inventory, movement or alert history cannot be deleted.`
+    );
+
+    if (!confirmed) return;
+
+    setError("");
+    setMessage("");
+
+    try {
+      await deleteWarehouse(warehouse.id);
+      setMessage("Warehouse deleted successfully.");
+      if (editingId === warehouse.id) setEditingId(null);
+      await loadData();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Unable to delete warehouse.");
     }
   };
 
@@ -145,7 +207,6 @@ export default function Warehouses() {
           <h2>Warehouse Management</h2>
           <p>Manage warehouse locations and their stock.</p>
         </div>
-
         <button className="secondary-button" onClick={loadData}>
           <RefreshCw size={16} /> Refresh
         </button>
@@ -166,22 +227,12 @@ export default function Warehouses() {
           <form className="stacked-form" onSubmit={handleCreateWarehouse}>
             <div className="form-group">
               <label>Warehouse Name</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Mumbai Warehouse"
-                required
-              />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Mumbai Warehouse" required />
             </div>
 
             <div className="form-group">
               <label>Location</label>
-              <input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. Mumbai, Maharashtra"
-                required
-              />
+              <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Mumbai, Maharashtra" required />
             </div>
 
             <button className="primary-button" disabled={savingWarehouse}>
@@ -201,52 +252,30 @@ export default function Warehouses() {
           <form className="stacked-form" onSubmit={handleAssignInventory}>
             <div className="form-group">
               <label>Product</label>
-              <select
-                value={productId}
-                onChange={(e) => setProductId(e.target.value)}
-                required
-              >
+              <select value={productId} onChange={(e) => setProductId(e.target.value)} required>
                 <option value="">Select product</option>
                 {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.sku})
-                  </option>
+                  <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
                 ))}
               </select>
             </div>
 
             <div className="form-group">
               <label>Warehouse</label>
-              <select
-                value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                required
-              >
+              <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} required>
                 <option value="">Select warehouse</option>
                 {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
+                  <option key={w.id} value={w.id}>{w.name}</option>
                 ))}
               </select>
             </div>
 
             <div className="form-group">
               <label>Initial Stock Quantity</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={initialQuantity}
-                onChange={(e) => setInitialQuantity(e.target.value)}
-                required
-              />
+              <input type="number" min="0" step="1" value={initialQuantity} onChange={(e) => setInitialQuantity(e.target.value)} required />
             </div>
 
-            <button
-              className="primary-button"
-              disabled={savingInventory || products.length === 0 || warehouses.length === 0}
-            >
+            <button className="primary-button" disabled={savingInventory || products.length === 0 || warehouses.length === 0}>
               {savingInventory ? "Assigning..." : "Assign Product"}
             </button>
           </form>
@@ -269,6 +298,7 @@ export default function Warehouses() {
                 <th>Location</th>
                 <th>Product Records</th>
                 <th>Total Stock Units</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -276,7 +306,6 @@ export default function Warehouses() {
                 const records = inventory.filter(
                   (item) => item.warehouse_id === warehouse.id
                 );
-
                 const totalStock = records.reduce(
                   (sum, item) => sum + item.available_quantity,
                   0
@@ -284,19 +313,44 @@ export default function Warehouses() {
 
                 return (
                   <tr key={warehouse.id}>
-                    <td><strong>{warehouse.name}</strong></td>
-                    <td>{warehouse.location}</td>
-                    <td>{records.length}</td>
-                    <td>{totalStock}</td>
+                    {editingId === warehouse.id ? (
+                      <>
+                        <td><input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></td>
+                        <td><input value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} /></td>
+                        <td>{records.length}</td>
+                        <td>{totalStock}</td>
+                        <td>
+                          <button className="primary-button" disabled={savingWarehouse} onClick={() => handleUpdate(warehouse.id)}>
+                            <Check size={15} /> Save
+                          </button>
+                          <button className="secondary-button" onClick={() => setEditingId(null)}>
+                            <X size={15} /> Cancel
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td><strong>{warehouse.name}</strong></td>
+                        <td>{warehouse.location}</td>
+                        <td>{records.length}</td>
+                        <td>{totalStock}</td>
+                        <td>
+                          <button className="secondary-button" onClick={() => startEdit(warehouse)}>
+                            <Pencil size={15} /> Edit
+                          </button>
+                          <button className="secondary-button" onClick={() => handleDelete(warehouse)}>
+                            <Trash2 size={15} /> Delete
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 );
               })}
 
               {warehouses.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="empty-state">
-                    No warehouses registered yet.
-                  </td>
+                  <td colSpan={5} className="empty-state">No warehouses registered yet.</td>
                 </tr>
               )}
             </tbody>
