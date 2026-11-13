@@ -24,22 +24,6 @@ import StatCard from "../components/StatCard";
 import InventoryTable from "../components/InventoryTable";
 import AlertPanel from "../components/AlertPanel";
 
-function extractArray(response: any): any[] {
-  if (Array.isArray(response)) return response;
-
-  if (response && typeof response === "object") {
-    if (Array.isArray(response.alerts)) return response.alerts;
-    if (Array.isArray(response.products)) return response.products;
-    if (Array.isArray(response.warehouses)) return response.warehouses;
-    if (Array.isArray(response.inventory)) return response.inventory;
-    if (Array.isArray(response.items)) return response.items;
-    if (Array.isArray(response.data)) return response.data;
-  }
-
-  console.warn("Expected an array from API, received:", response);
-  return [];
-}
-
 export default function Dashboard() {
   const [products, setProducts] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);

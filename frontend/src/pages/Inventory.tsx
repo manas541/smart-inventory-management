@@ -7,8 +7,6 @@ import {
   createStockMovement,
 } from "../services/api";
 import {
-  ArrowDownCircle,
-  ArrowUpCircle,
   RefreshCw,
   Package,
 } from "lucide-react";
