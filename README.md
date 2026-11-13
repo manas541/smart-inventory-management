@@ -8,7 +8,7 @@ A full-stack inventory management application with real-time stock monitoring, a
 - **Backend API:** https://smart-inventory-management-upha.onrender.com
 - **API Documentation:** https://smart-inventory-management-upha.onrender.com/docs
 
-*Note: Render free-tier services may take a short time to respond after being idle.*
+> **Note:** Render free-tier services may take a short time to respond after being idle.
 
 ## Features
 
@@ -21,6 +21,7 @@ A full-stack inventory management application with real-time stock monitoring, a
 - **Real-Time Updates:** WebSocket-based updates when inventory changes.
 - **Analytics Dashboard:** Visualize stock distribution, movements, and alert statistics.
 - **Concurrency Handling:** Database transactions and row-level locking to prevent conflicting stock updates.
+- **Docker Support:** Start the FastAPI backend and PostgreSQL database together using Docker Compose.
 
 ## Technology Stack
 
@@ -29,30 +30,41 @@ A full-stack inventory management application with real-time stock monitoring, a
 | Frontend | React, TypeScript, Vite, Recharts |
 | Backend | Python, FastAPI, SQLAlchemy |
 | Database | PostgreSQL |
-| Real-time communication | WebSockets |
-| Background processing | APScheduler |
-| API documentation | Swagger / OpenAPI |
+| Real-time Communication | WebSockets |
+| Background Processing | APScheduler |
+| Database Migrations | Alembic |
+| Containerization | Docker, Docker Compose |
+| API Documentation | Swagger / OpenAPI |
 
 ## Architecture
 
 The application separates inventory operations from alert evaluation.
 
 ```text
-             React Dashboard
-                    |
-             REST API / WebSocket
-                    |
-              FastAPI Backend
-                    |
-          +---------+---------+
-          |                   |
-    CRUD Operations      Alert Service
-          |                   |
-          +---------+---------+
-                    |
-                PostgreSQL
-                    |
-              Alert Scheduler
+                 React Dashboard
+                        |
+                 REST API / WebSocket
+                        |
+              +---------------------+
+              |    FastAPI Backend  |
+              |                     |
+              |  +---------------+  |
+              |  | CRUD Layer    |  |
+              |  +---------------+  |
+              |                     |
+              |  +---------------+  |
+              |  | Alert Service |  |
+              |  +---------------+  |
+              |                     |
+              |  +---------------+  |
+              |  | WebSocket     |  |
+              |  | Manager       |  |
+              |  +---------------+  |
+              +---------------------+
+                        |
+                   PostgreSQL
+                        |
+                 Alert Scheduler
 ```
 
 ### Separation of Concerns
@@ -61,6 +73,26 @@ The application separates inventory operations from alert evaluation.
 - **Alert Service:** Evaluates inventory conditions and manages alert creation and resolution.
 - **Scheduler:** Periodically reevaluates alerts so time-based conditions can expire without requiring another stock movement.
 - **WebSocket Manager:** Broadcasts inventory and alert updates to connected dashboard clients.
+
+### Docker Architecture
+
+Docker Compose manages the backend API and PostgreSQL database.
+
+```text
+              Docker Compose
+                     |
+          +----------+----------+
+          |                     |
+     FastAPI API           PostgreSQL
+          |                     |
+          +----------+----------+
+                     |
+              Persistent Volume
+```
+
+The API connects to PostgreSQL through the internal Docker Compose network. Database migrations are executed automatically before the API starts.
+
+The React frontend currently runs separately using Vite.
 
 ## Database Design
 
@@ -84,6 +116,8 @@ The application uses PostgreSQL with the following entities:
 
 A unique constraint on `(product_id, warehouse_id)` prevents duplicate inventory records for the same product and warehouse.
 
+Database constraints also prevent negative inventory quantities and invalid stock movement quantities.
+
 ## Alerting Logic
 
 Alert evaluation is implemented in a separate Python service module rather than being embedded in API route handlers.
@@ -92,7 +126,9 @@ Alert evaluation is implemented in a separate Python service module rather than 
 
 An alert is generated when:
 
-`available_quantity <= minimum_stock`
+```text
+available_quantity <= minimum_stock
+```
 
 The alert is resolved when available stock rises above the configured minimum threshold.
 
@@ -100,7 +136,7 @@ The alert is resolved when available stock rises above the configured minimum th
 
 The alert service calculates outbound stock movements over a rolling one-hour window.
 
-When the total outbound quantity reaches the configured threshold (30 units per hour), a fast-depletion alert is generated.
+When the total outbound quantity reaches the configured threshold of 30 units per hour, a fast-depletion alert is generated.
 
 The alert is reevaluated periodically by APScheduler. It can be resolved when the recent outbound movement total falls below the threshold.
 
@@ -116,7 +152,7 @@ This application uses WebSockets for real-time dashboard updates.
 
 A persistent connection is established between the browser and backend. When inventory changes, the backend broadcasts an event to connected clients.
 
-Advantages:
+**Advantages:**
 - Immediate updates without repeatedly requesting data.
 - Lower unnecessary request overhead.
 - Useful for dashboards accessed by multiple users.
@@ -125,11 +161,11 @@ Advantages:
 
 An alternative would be polling the REST API at fixed intervals.
 
-Advantages:
+**Advantages:**
 - Simpler implementation.
 - Easier infrastructure and connection management.
 
-Disadvantages:
+**Disadvantages:**
 - Updates are delayed until the next polling interval.
 - Repeated requests are made even when no data changes.
 
@@ -207,7 +243,130 @@ Database constraints provide additional protection against invalid quantities.
 
 Interactive API documentation is available through FastAPI Swagger UI at `/docs`.
 
-## Local Setup
+## Getting Started
+
+There are two ways to run the application locally:
+
+1. Docker Compose (recommended).
+2. Manual setup using Python and PostgreSQL.
+
+## Running with Docker Compose (Recommended)
+
+Docker Compose starts the FastAPI backend and PostgreSQL database together.
+
+### Prerequisites
+
+- Docker Desktop
+- Docker Compose
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/manas541/smart-inventory-management.git
+cd smart-inventory-management
+```
+
+### 2. Start the backend and database
+
+From the project root, execute:
+
+```bash
+docker compose up --build -d
+```
+
+Docker Compose will:
+
+1. Build the FastAPI backend image.
+2. Start the PostgreSQL container.
+3. Wait for the database health check.
+4. Run Alembic migrations automatically.
+5. Start the FastAPI application.
+
+### 3. Access the services
+
+| Service | URL |
+|---|---|
+| Backend API | http://localhost:8001 |
+| Health Check | http://localhost:8001/health |
+| Swagger Documentation | http://localhost:8001/docs |
+| PostgreSQL | localhost:5433 |
+
+### 4. Start the React frontend
+
+Open another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Create a `.env` file inside the frontend directory:
+
+```env
+VITE_API_URL=http://127.0.0.1:8001
+VITE_WS_URL=ws://127.0.0.1:8001/ws/inventory
+```
+
+The frontend will be available at:
+
+```text
+http://localhost:5173
+```
+
+### Useful Docker Commands
+
+Check running containers:
+
+```bash
+docker compose ps
+```
+
+View API logs:
+
+```bash
+docker compose logs -f api
+```
+
+View database logs:
+
+```bash
+docker compose logs -f db
+```
+
+Stop the containers:
+
+```bash
+docker compose down
+```
+
+Stop containers and remove the database volume:
+
+```bash
+docker compose down -v
+```
+
+> **Warning:** The `-v` option deletes the persistent PostgreSQL data. Use it only when you intentionally want to reset the database.
+
+### Database Persistence
+
+PostgreSQL data is stored in a named Docker volume called `inventory_data`.
+
+This allows database records to persist when containers are stopped and restarted.
+
+The API connects to PostgreSQL through the Docker Compose service hostname `db`, using the internal container network.
+
+### Docker Configuration
+
+| File | Purpose |
+|---|---|
+| `backend/Dockerfile` | Builds the FastAPI backend image |
+| `backend/.dockerignore` | Excludes unnecessary files and local environment secrets |
+| `docker-compose.yml` | Defines API and PostgreSQL services, networking, health checks, and persistent storage |
+
+## Manual Local Setup
+
+Docker is not mandatory for running the application. You can also run the backend using a Python virtual environment and a locally installed PostgreSQL database.
 
 ### Prerequisites
 
@@ -231,7 +390,7 @@ python -m venv venv
 
 Activate the virtual environment.
 
-Windows PowerShell:
+**Windows PowerShell:**
 
 ```powershell
 .\venv\Scripts\Activate.ps1
@@ -249,7 +408,7 @@ Create a `.env` file inside the backend directory:
 DATABASE_URL=postgresql://YOUR_USER:YOUR_PASSWORD@localhost:5432/smart_inventory
 ```
 
-Create the PostgreSQL database named `smart_inventory`, then run migrations:
+Create a PostgreSQL database named `smart_inventory`, then run migrations:
 
 ```bash
 alembic upgrade head
@@ -302,7 +461,8 @@ This ensures that time-dependent alerts, such as fast-depletion alerts, can be r
 - Demand forecasting has not been implemented because meaningful historical demand data is not yet available.
 - Scheduler execution is process-local. Multiple backend replicas would require a single scheduler instance or distributed scheduling mechanism.
 - Authentication and role-based authorization are not currently implemented.
-- Docker-based containerization has not been implemented in this version.
+- The React frontend is not included in the Docker Compose setup and currently runs separately using Vite.
+- The Docker Compose configuration is intended for local development and evaluation, not production deployment.
 
 ## Future Improvements
 
@@ -311,7 +471,7 @@ This ensures that time-dependent alerts, such as fast-depletion alerts, can be r
 - Redis Pub/Sub for WebSocket broadcasting across multiple backend instances.
 - Authentication and role-based access control.
 - Automated reorder recommendations based on predicted demand.
-- Docker-based containerization for consistent deployment across environments.
+- Containerization of the React frontend and production-ready deployment configuration.
 
 ## Author
 
