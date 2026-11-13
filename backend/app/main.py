@@ -1,4 +1,4 @@
-
+import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from app.routers.product import router as product_router
@@ -38,14 +38,19 @@ async def stop_alert_scheduler():
     if scheduler.running:
         scheduler.shutdown(wait=False)
         print("Inventory alert scheduler stopped.")
+
+allowed_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[origin.strip() for origin in allowed_origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 @app.get("/")
 def root():
